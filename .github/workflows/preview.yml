@@ -1,0 +1,49 @@
+# Plan morning-digest § 3/§ 4 (ADR 0003): publish one rig page as a public preview on GitHub Pages.
+# The HTML is built on the runner and deployed as a Pages artifact, never committed, so a later run
+# with the marker left blank replaces it on the same link and leaves no copy in git history.
+name: preview
+on:
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: "LANE_MARKER for the banner. Leave blank to publish with no marker (clean-up)."
+        required: false
+        default: ""
+      page:
+        description: "Page to save"
+        required: false
+        default: "/digest/2026-10-28"
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Save the page as one HTML file
+        env:
+          LANE_ID: lane-07
+          LANE_MARKER: ${{ inputs.marker }}
+          PAGE: ${{ inputs.page }}
+        run: pnpm -s preview "$PAGE" _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
